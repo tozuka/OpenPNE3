@@ -35,6 +35,10 @@
         <target>ﾒｰﾙｱﾄﾞﾚｽ</target>
       </trans-unit>
       <trans-unit id="">
+        <source>Languages</source>
+        <target>言語</target>
+      </trans-unit>
+      <trans-unit id="">
         <source>Password</source>
         <target>ﾊﾟｽﾜｰﾄﾞ</target>
       </trans-unit>

@@ -208,4 +208,25 @@ class memberActions extends opMemberAction
     return parent::executeShowAllMemberActivity($request);
   }
 
+  /**
+   * Executes changeLanguage action
+   *
+   * @param sfWebRequest $request a request object
+   */
+  public function executeChangeLanguage(sfWebRequest $request)
+  {
+    if ($request->isMethod(sfWebRequest::POST))
+    {
+      $form = new opLanguageSelecterForm();
+      $form->bind($request->getParameter('language'));
+      if ($form->isValid())
+      {
+        $form->setCulture();
+        $this->redirect($form->getValue('next_uri'));
+      }
+    }
+    $this->redirect('@homepage');
+  }
+
+
 }

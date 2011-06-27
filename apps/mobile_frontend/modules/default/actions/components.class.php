@@ -27,6 +27,11 @@ class defaultComponents extends sfComponents
   {
   }
 
+  public function executeLanguageSelecterBox()
+  {
+    $this->form = new opLanguageSelecterForm();
+  }
+
   public function executeLoginFormBox()
   {
     $this->forms = $this->getUser()->getAuthForms();
