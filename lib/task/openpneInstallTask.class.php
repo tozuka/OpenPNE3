@@ -20,6 +20,15 @@ class openpneInstallTask extends sfDoctrineBaseTask
       new sfCommandOption('env', null, sfCommandOption::PARAMETER_REQUIRED, 'The environment', 'prod'),
       new sfCommandOption('redo', null, sfCommandOption::PARAMETER_NONE, 'Executes a reinstall'),
       new sfCommandOption('non-recreate-db', null, sfCommandOption::PARAMETER_NONE, 'Non recreate DB'),
+
+      new sfCommandOption('dbms', null, sfCommandOption::PARAMETER_REQUIRED, 'DBMS', 'mysql'),
+      new sfCommandOption('username', null, sfCommandOption::PARAMETER_REQUIRED, 'database username', null),
+      new sfCommandOption('password', null, sfCommandOption::PARAMETER_OPTIONAL, 'database password (optional)', null),
+      new sfCommandOption('hostname', null, sfCommandOption::PARAMETER_REQUIRED, 'database hostname', null),
+      new sfCommandOption('port', null, sfCommandOption::PARAMETER_OPTIONAL, 'database port number (optional)', null),
+      new sfCommandOption('dbname', null, sfCommandOption::PARAMETER_REQUIRED, 'database name', null),
+      new sfCommandOption('sock', null, sfCommandOption::PARAMETER_OPTIONAL, 'database socket path (optional)', null),
+      new sfCommandOption('noconfirm', null, sfCommandOption::PARAMETER_NONE, 'do not confirm database settings', null),
     ));
 
     $this->briefDescription = 'Install OpenPNE';
@@ -58,24 +67,74 @@ EOF;
 
     if (!$options['redo'])
     {
-      $validator = new sfValidatorCallback(array('required' => true, 'callback' => array($this, 'validateDBMS')));
-      $dbms = $this->askAndValidate(array('Choose DBMS:', '- mysql', '- pgsql (unsupported)', '- sqlite (unsupported)'), $validator, array('style' => 'QUESTION_LARGE'));
-      if (!$dbms)
+      $validatorDBMS = new sfValidatorCallback(array('required' => true, 'callback' => array($this, 'validateDBMS')));
+      if (isset($options['dbms']))
       {
-        $this->logSection('installer', 'task aborted');
-
-        return 1;
+        $dbms = $validatorDBMS->clean($options['dbms']);
       }
+      else
+      {
+        $dbms = $this->askAndValidate(array('Choose DBMS:', '- mysql', '- pgsql (unsupported)', '- sqlite (unsupported)'), $validatorDBMS, array('style' => 'QUESTION_LARGE'));
+        if (!$dbms)
+        {
+          $this->logSection('installer', 'task aborted');
+
+          return 1;
+        }
+      }
+
+      $validatorRequired = new opValidatorString();
+      $validatorOptional = new opValidatorString(array('required' => false));
 
       if ($dbms !== 'sqlite')
       {
-        $username = $this->askAndValidate(array('Type database username'), new opValidatorString(), array('style' => 'QUESTION_LARGE'));
-        $password = $this->askAndValidate(array('Type database password (optional)'), new opValidatorString(array('required' => false)), array('style' => 'QUESTION_LARGE'));
-        $hostname = $this->askAndValidate(array('Type database hostname'), new opValidatorString(), array('style' => 'QUESTION_LARGE'));
-        $port = $this->askAndValidate(array('Type database port number (optional)'), new sfValidatorInteger(array('required' => false)), array('style' => 'QUESTION_LARGE'));
+        if (isset($options['username']))
+        {
+          $username = $validatorRequired->clean($options['username']);
+        }
+        else
+        {
+          $username = $this->askAndValidate(array('Type database username'), $validatorRequired, array('style' => 'QUESTION_LARGE'));
+        }
+
+        if (isset($options['password']))
+        {
+          $password = $validatorOptional->clean($options['password']);
+        }
+        else
+        {
+          $password = $this->askAndValidate(array('Type database password (optional)'), $validatorOptional, array('style' => 'QUESTION_LARGE'));
+        }
+
+        if (isset($options['hostname']))
+        {
+          $hostname = $validatorRequired->clean($options['hostname']);
+        }
+        else
+        {
+          $hostname = $this->askAndValidate(array('Type database hostname'), $validatorRequired, array('style' => 'QUESTION_LARGE'));
+        }
+
+        $validatorOptionalInt = new sfValidatorInteger(array('required' => false));
+
+        if (isset($options['port']))
+        {
+          $port = $validatorOptionalInt->clean($options['port']);
+        }
+        else
+        {
+          $port = $this->askAndValidate(array('Type database port number (optional)'), $validatorOptionalInt, array('style' => 'QUESTION_LARGE'));
+        }
       }
 
-      $dbname = $this->askAndValidate(array('Type database name'), new opValidatorString(), array('style' => 'QUESTION_LARGE'));
+      if (isset($options['dbname']))
+      {
+        $dbname = $validatorRequired->clean($options['dbname']);
+      }
+      else
+      {
+        $dbname = $this->askAndValidate(array('Type database name'), $validatorRequired, array('style' => 'QUESTION_LARGE'));
+      }
       if ($dbms == 'sqlite')
       {
         $dbname = realpath(dirname($dbname)).DIRECTORY_SEPARATOR.basename($dbname);
@@ -83,7 +142,14 @@ EOF;
 
       if ($dbms == 'mysql' && ($hostname == 'localhost' || $hostname == '127.0.0.1'))
       {
-        $sock = $this->askAndValidate(array('Type database socket path (optional)'), new opValidatorString(array('required' => false)), array('style' => 'QUESTION_LARGE'));
+        if (isset($options['sock']))
+        {
+          $sock = $validatorOptional->clean($options['sock']);
+        }
+        else
+        {
+          $sock = $this->askAndValidate(array('Type database socket path (optional)'), $validatorOptional, array('style' => 'QUESTION_LARGE'));
+        }
       }
 
       if (!$password)
@@ -102,13 +168,16 @@ EOF;
       );
     }
 
-    $confirmAsk = 'Is it OK to start this task? (Y/n)';
-    $confirmAsks = isset($list) ? array_merge($list, array('', $confirmAsk)) : array($confirmAsk);
-    if (!$this->askConfirmation($confirmAsks, 'QUESTION_LARGE'))
+    if (!isset($options['noconfirm']))
     {
-      $this->logSection('installer', 'task aborted');
+      $confirmAsk = 'Is it OK to start this task? (Y/n)';
+      $confirmAsks = isset($list) ? array_merge($list, array('', $confirmAsk)) : array($confirmAsk);
+      if (!$this->askConfirmation($confirmAsks, 'QUESTION_LARGE'))
+      {
+        $this->logSection('installer', 'task aborted');
 
-      return 1;
+        return 1;
+      }
     }
 
     $this->doInstall($dbms, $username, $password, $hostname, $port, $dbname, $sock, $options);
