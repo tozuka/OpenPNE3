@@ -30,6 +30,7 @@ class OpenPNE_KtaiEmoji_Common
     function get_emoji_code4emoji($emoji)
     {
         $code_id = $this->get_emoji_code_id4emoji($emoji);
+        $code = '';
         if ($code_id !== false) {
             $code = $this->carrier_id . ':' . $code_id;
         }
